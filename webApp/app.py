@@ -1,4 +1,5 @@
 import streamlit as st
+from recommend import Recommend
 
 # Tab name and icon
 st.set_page_config(
@@ -6,10 +7,4 @@ st.set_page_config(
     page_icon="🎬",  
 )
 
-# for execute 
-page = st.sidebar.selectbox('Navigate', ("Recommended Movies", "Resources"))
-
-if page == "Recommended Movies":
-    summarize_page()
-elif page == "Resources":
-    resources_page()
+Recommend()
