@@ -3,3 +3,6 @@ numpy
 pandas
 scikit-learn
 requests
+pyspark==3.5.0
+findspark
+python-dotenv
