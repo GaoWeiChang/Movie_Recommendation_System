@@ -9,6 +9,7 @@ from pyspark.ml.linalg import Vectors, VectorUDT
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import os
 import sys
@@ -60,6 +61,84 @@ movies['crew'] = movies['crew'].apply(extract_director)
 movie_df = spark.createDataFrame(movies)
 
 ''' Build Recommendation System '''
+
+'''
+Plot description based recommender
+    - We will compute pairwise similarity scores for all movies based on their plot descriptions and recommend movies based on that similarity score. The plot description is given in the overview feature of our dataset
+    - This approach is indeed based on computing the cosine similarity between the vector representations of movie overviews.
+'''
+def create_pb_recommender(movie_df):
+    # Tokenize overview
+    tokenizer = Tokenizer(inputCol="overview", outputCol="words")
+    
+    # Remove stop words
+    remover = StopWordsRemover(inputCol="words", outputCol="filtered_words")
+    
+    # Convert words to term frequency vectors
+    hashingTF = HashingTF(inputCol="filtered_words", outputCol="raw_features", numFeatures=20000)
+    
+    # Calculate IDF
+    idf = IDF(inputCol="raw_features", outputCol="tfidf_features")
+    
+    # Create and fit the pipeline
+    pipeline = Pipeline(stages=[tokenizer, remover, hashingTF, idf])
+    model = pipeline.fit(movie_df)
+    tfidf_df = model.transform(movie_df)
+    
+    return tfidf_df
+
+# cosine similarity
+def cosine_similarity_vectors(v1, v2):
+    v1_array = v1.toArray()
+    v2_array = v2.toArray()
+    dot_product = float(v1_array.dot(v2_array))
+    norm1 = float(np.sqrt(v1_array.dot(v1_array)))
+    norm2 = float(np.sqrt(v2_array.dot(v2_array)))
+    
+    return float(dot_product / (norm1 * norm2)) if norm1 * norm2 != 0 else 0.0
+
+def get_pb_recommendations(movie_title, feature_df, feature_col, top_n=10):
+    # Get the feature vector for the input movie
+    movie_features = feature_df.filter(col("title") == movie_title) \
+                              .select(feature_col) \
+                              .first()
+    
+    if not movie_features:
+        return None
+    
+    # Create broadcast variable for movie features
+    movie_vector_broadcast = spark.sparkContext.broadcast(movie_features[0])
+    
+    # Create UDF with broadcasted vector
+    @udf(returnType=FloatType())
+    def cosine_sim_with_broadcast(v1):
+        return cosine_similarity_vectors(v1, movie_vector_broadcast.value)
+    
+    # Calculate similarities
+    similarities = feature_df.withColumn(
+        "similarity",
+        cosine_sim_with_broadcast(col(feature_col))
+    )
+    
+    # Get top N similar movies
+    result = similarities.filter(col("title") != movie_title) \
+                        .orderBy(col("similarity").desc()) \
+                        .select("title", "similarity") \
+                        .limit(top_n)
+    
+    # Clean up broadcast variable
+    movie_vector_broadcast.unpersist()
+    
+    return result
+
+# create recommender
+tfidf_df = create_pb_recommender(movie_df)
+
+# Plot-based recommendations
+plot_recommendations = get_pb_recommendations("The Dark Knight Rises", tfidf_df, "tfidf_features")
+
+plot_recommendations.show()
+
 '''
 Metadata-based Recommendations
     A recommender based on the following metadata: the 3 top actors, the director, related genres and the movie plot keywords.
