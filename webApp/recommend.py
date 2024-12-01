@@ -97,14 +97,25 @@ def Recommend():
         "Type or select a movie from the dropdown",
         movie_list
     )
-    
-    if st.button('Show Recommendation'):
-        recommended_movies = get_recommendations(selected_movie, cosine_sim, movies)
-        st.write("Recommended Movies:")
         
-        cols = st.columns(5)
-        for i, (_, movie) in enumerate(recommended_movies.iterrows()):
-            with cols[i % 5]:
-                st.text(movie['title'])
-                poster_url = fetch_poster(movie['movie_id'])
-                st.image(poster_url, width=150)
+    if st.button('Show Recommendation'):
+            recommended_movies = get_recommendations(selected_movie, cosine_sim, movies)
+            st.write("Recommended Movies:")
+            
+            # First row
+            cols1 = st.columns(5)
+            for i, (_, movie) in enumerate(recommended_movies.iloc[:5].iterrows()):
+                with cols1[i]:
+                    st.text(movie['title'])
+                    poster_url = fetch_poster(movie['movie_id'])
+                    st.image(poster_url, width=150)
+            
+            st.write("")  # Add space between rows
+            
+            # Second row
+            cols2 = st.columns(5)
+            for i, (_, movie) in enumerate(recommended_movies.iloc[5:].iterrows()):
+                with cols2[i]:
+                    st.text(movie['title'])
+                    poster_url = fetch_poster(movie['movie_id'])
+                    st.image(poster_url, width=150)
