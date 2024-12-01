@@ -1,2 +1,4 @@
 
 /venv
+dataset/tmdb_100_credits.csv
+dataset/tmdb_100_movies.csv
